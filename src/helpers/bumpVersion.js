@@ -3,22 +3,51 @@ const semver = require('semver')
 
 const requireScript = require('./requireScript')
 
+function bumpPreRelease(oldVersion, releaseType, identifier) {
+  const isOldVersionStable = semver.prerelease(oldVersion) === null;
+
+  if (isOldVersionStable) {
+    core.info("Old version is stable, starting a new prerelease");
+    return semver.inc(oldVersion, `pre${releaseType}`, identifier);
+  }
+  else {
+    core.info("Old version is already a prerelease");
+    const stableBump = semver.inc(oldVersion, releaseType);
+    const expected = semver.inc(stableBump, `pre${releaseType}`, identifier);
+
+    if (semver.diff(oldVersion, expected) === "prerelease") {
+      core.info("Same bump level, incrementing prerelease");
+      return semver.inc(oldVersion, "prerelease", identifier);
+    }
+    else {
+      core.info("Different bump level, starting a new prerelease");
+      return semver.inc(oldVersion, `pre${releaseType}`, identifier);
+    }
+  }
+}
+
 /**
  * Bumps the given version with the given release type
  *
  * @param releaseType
- * @param version
+ * @param oldVersion
  * @returns {string}
  */
-module.exports = async (releaseType, version) => {
+module.exports = async (releaseType, oldVersion) => {
   let newVersion
 
   const prerelease = core.getBooleanInput('pre-release')
   const identifier = core.getInput('pre-release-identifier')
 
-  if (version) {
-    newVersion = semver.inc(version, (prerelease ? `pre${releaseType}` : releaseType), identifier)
-  } else {
+  if (oldVersion) {
+    if (prerelease) {
+      newVersion = bumpPreRelease(oldVersion, releaseType, identifier)
+    }
+    else {
+      newVersion = semver.inc(oldVersion, releaseType, identifier)
+    }
+  }
+  else {
 
     const fallbackVersion = core.getInput('fallback-version')
 
